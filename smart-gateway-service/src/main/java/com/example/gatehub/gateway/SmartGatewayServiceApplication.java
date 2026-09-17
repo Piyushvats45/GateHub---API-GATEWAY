@@ -1,0 +1,15 @@
+package com.example.gatehub.gateway;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class SmartGatewayServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SmartGatewayServiceApplication.class, args);
+
+        System.out.println("running on port 8080");
+	}
+
+}
