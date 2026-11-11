@@ -10,6 +10,7 @@ import com.example.gatehub.management.entity.ManagementUser;
 import com.example.gatehub.management.entity.Organization;
 import com.example.gatehub.management.entity.OrganizationStatus;
 import com.example.gatehub.management.entity.Role;
+import com.example.gatehub.management.event.GatewayConfigurationEventService;
 import com.example.gatehub.management.exception.ApiException;
 import com.example.gatehub.management.repository.ManagementUserRepository;
 import com.example.gatehub.management.repository.OrganizationRepository;
@@ -32,17 +33,20 @@ public class OrganizationService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final TenantContext tenantContext;
+    private final GatewayConfigurationEventService configurationEventService;
 
     public OrganizationService(OrganizationRepository organizationRepository,
                                ManagementUserRepository managementUserRepository,
                                RoleRepository roleRepository, PasswordEncoder passwordEncoder,
-                               AuditService auditService, TenantContext tenantContext) {
+                               AuditService auditService, TenantContext tenantContext,
+                               GatewayConfigurationEventService configurationEventService) {
         this.organizationRepository = organizationRepository;
         this.managementUserRepository = managementUserRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditService = auditService;
         this.tenantContext = tenantContext;
+        this.configurationEventService = configurationEventService;
     }
 
     // CRUD on ORGANISATION
@@ -104,6 +108,9 @@ public class OrganizationService {
                 "ORGANIZATION", id.toString(), startedAt,
                 "Organization name and slug updated");
 
+        configurationEventService.publish("ORGANIZATION_UPDATED",
+                organization.getId(), null, null);
+
         return OrganizationResponse.from(organization);
     }
 
@@ -126,6 +133,9 @@ public class OrganizationService {
                 "ORGANIZATION", id.toString(),
                 startedAt, "Status changed to " + request.getStatus());
 
+        configurationEventService.publish("ORGANIZATION_" + request.getStatus(),
+                organization.getId(), null, null);
+
         return OrganizationResponse.from(organization);
     }
 
@@ -142,6 +152,9 @@ public class OrganizationService {
         auditService.record(organization, "DELETE_ORGANIZATION",
                 "ORGANIZATION", id.toString(), startedAt,
                 "Organization soft-deleted");
+
+        configurationEventService.publish("ORGANIZATION_DELETED",
+                organization.getId(), null, null);
     }
 
     // CRUD on TENANT_ADMIN
