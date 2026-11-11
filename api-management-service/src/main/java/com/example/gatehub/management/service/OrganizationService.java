@@ -3,6 +3,7 @@ package com.example.gatehub.management.service;
 import com.example.gatehub.management.dto.requestDto.OrganizationRequest;
 import com.example.gatehub.management.dto.requestDto.OrganizationStatusRequest;
 import com.example.gatehub.management.dto.requestDto.TenantAdminRequest;
+import com.example.gatehub.management.dto.requestDto.TenantOrganizationRequest;
 import com.example.gatehub.management.dto.responseDto.OrganizationResponse;
 import com.example.gatehub.management.dto.responseDto.TenantAdminResponse;
 import com.example.gatehub.management.entity.ManagementUser;
@@ -24,18 +25,24 @@ import java.util.List;
 
 @Service
 public class OrganizationService {
+
     private final OrganizationRepository organizationRepository;
     private final ManagementUserRepository managementUserRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
+    private final TenantContext tenantContext;
 
     public OrganizationService(OrganizationRepository organizationRepository,
                                ManagementUserRepository managementUserRepository,
-                               RoleRepository roleRepository, PasswordEncoder passwordEncoder) {
+                               RoleRepository roleRepository, PasswordEncoder passwordEncoder,
+                               AuditService auditService, TenantContext tenantContext) {
         this.organizationRepository = organizationRepository;
         this.managementUserRepository = managementUserRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
+        this.tenantContext = tenantContext;
     }
 
     // CRUD on ORGANISATION
@@ -55,6 +62,10 @@ public class OrganizationService {
         organization.setUpdatedAt(LocalDateTime.now());
 
         organizationRepository.save(organization);
+
+        auditService.record(organization, "CREATE_ORGANIZATION", "ORGANIZATION",
+                organization.getId().toString(), startedAt,
+                "Organization created in PENDING status");
 
         return OrganizationResponse.from(organization);
     }
@@ -89,6 +100,10 @@ public class OrganizationService {
         organization.setSlug(request.getSlug());
         organization.setUpdatedAt(LocalDateTime.now());
 
+        auditService.record(organization, "UPDATE_ORGANIZATION",
+                "ORGANIZATION", id.toString(), startedAt,
+                "Organization name and slug updated");
+
         return OrganizationResponse.from(organization);
     }
 
@@ -107,6 +122,10 @@ public class OrganizationService {
         organization.setStatus(request.getStatus());
         organization.setUpdatedAt(LocalDateTime.now());
 
+        auditService.record(organization, "CHANGE_ORGANIZATION_STATUS",
+                "ORGANIZATION", id.toString(),
+                startedAt, "Status changed to " + request.getStatus());
+
         return OrganizationResponse.from(organization);
     }
 
@@ -119,6 +138,10 @@ public class OrganizationService {
         organization.setStatus(OrganizationStatus.DELETED);
         organization.setDeletedAt(LocalDateTime.now());
         organization.setUpdatedAt(LocalDateTime.now());
+
+        auditService.record(organization, "DELETE_ORGANIZATION",
+                "ORGANIZATION", id.toString(), startedAt,
+                "Organization soft-deleted");
     }
 
     // CRUD on TENANT_ADMIN
@@ -152,6 +175,10 @@ public class OrganizationService {
         user.setUpdatedAt(LocalDateTime.now());
         managementUserRepository.save(user);
 
+        auditService.record(organization, "CREATE_TENANT_ADMIN",
+                "MANAGEMENT_USER", user.getId().toString(),
+                startedAt, "Tenant administrator created");
+
         return TenantAdminResponse.from(user);
     }
 
@@ -177,6 +204,10 @@ public class OrganizationService {
         user.setEnabled(request.isEnabled());
         user.setUpdatedAt(LocalDateTime.now());
 
+        auditService.record(user.getOrganization(), "UPDATE_TENANT_ADMIN",
+                "MANAGEMENT_USER", user.getId().toString(), startedAt,
+                "Tenant administrator updated");
+
         return TenantAdminResponse.from(user);
     }
 
@@ -186,6 +217,10 @@ public class OrganizationService {
         long startedAt = System.nanoTime();
 
         ManagementUser user = getTenantAdminEntity(organizationId);
+
+        auditService.record(user.getOrganization(), "DELETE_TENANT_ADMIN",
+                "MANAGEMENT_USER", user.getId().toString(), startedAt,
+                "Tenant administrator deleted");
 
         managementUserRepository.delete(user);
     }
@@ -219,5 +254,32 @@ public class OrganizationService {
         getOrganization(organizationId);
         return managementUserRepository.findByOrganizationId(organizationId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Tenant administrator not found"));
+    }
+
+    // methods for tenant admin
+    @Transactional(readOnly = true)
+    public OrganizationResponse getOwnOrganization() {
+        return OrganizationResponse.from(tenantContext.getOrganization());
+    }
+
+    @Transactional
+    public OrganizationResponse updateOwnOrganization(TenantOrganizationRequest request) {
+        long startedAt = System.nanoTime();
+
+        Organization organization = tenantContext.getOrganization();
+
+        if(!organization.getName().equalsIgnoreCase(request.getName())
+                && organizationRepository.existsByNameIgnoreCase(request.getName())) {
+            throw new ApiException(HttpStatus.CONFLICT, "Organization name already exists");
+        }
+
+        organization.setName(request.getName());
+        organization.setUpdatedAt(LocalDateTime.now());
+
+        auditService.record(organization, "UPDATE_OWN_ORGANIZATION",
+                "ORGANIZATION", organization.getId().toString(), startedAt,
+                "Tenant updated its organization name");
+
+        return OrganizationResponse.from(organization);
     }
 }

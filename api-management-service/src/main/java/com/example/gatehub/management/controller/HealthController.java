@@ -2,7 +2,6 @@ package com.example.gatehub.management.controller;
 
 import com.example.gatehub.management.dto.responseDto.HealthResponse;
 import com.example.gatehub.management.service.HealthService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

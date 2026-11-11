@@ -1,6 +1,5 @@
 package com.example.gatehub.management.service;
 
-import com.example.gatehub.management.dto.responseDto.HealthResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
